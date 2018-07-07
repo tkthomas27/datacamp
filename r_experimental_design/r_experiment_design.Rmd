@@ -1,0 +1,160 @@
+---
+title: "Datacamp: Experiment Design in R"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+```
+
+Comparing differences in sepal length across species in the iris dataset.
+
+First visualize,
+
+```{r}
+ggplot(iris, aes(Species, Sepal.Length)) + geom_boxplot() + theme_minimal()
+```
+
+# t Test
+
+```{r}
+iris2 <- iris[iris$Species!="setosa",]
+
+ttest_results <- t.test(Sepal.Length ~ Species, data = iris2)
+
+library(broom)
+tidy(ttest_results)
+```
+
+# Power Test
+
+How to choose effect size?
+
+```{r}
+library(effsize)
+
+#cohens d
+cohend <- cohen.d(iris2$Sepal.Length, iris2$Species)
+
+#load the pwr package
+library(pwr)
+
+iris_size <- nrow(iris2)
+
+#calculate power
+pwr.t.test(n = iris_size, 
+           d = abs(cohend$estimate),
+           sig.level = 0.05,
+           type = "two.sample", 
+           alternative = "two.sided",
+           power = NULL)
+```
+
+
+# ANOVA
+
+```{r}
+anova_results <- aov(Sepal.Length ~ Species, data = iris)
+
+#Conduct Tukey's HSD test to create tukey_output
+tukey_output <- TukeyHSD(anova_results, conf.level = 0.95)
+
+#tidy tukey_output to make sense of the results
+broom::tidy(tukey_output)
+```
+
+```{r}
+#for a 2x2 grid of plots:
+par(mfrow=c(2, 2))
+
+#plot grade_aov
+plot(anova_results)
+```
+
+```{r}
+#Bartlett's test for homogeneity of variance
+bartlett.test(int_rate ~ grade, data = lendingclub)
+
+#conduct the Kruskal-Wallis rank sum test
+kruskal.test(int_rate ~ as.factor(grade),
+             data = lendingclub)
+
+```
+
+
+# Original Code
+
+```{r}
+#perform a t-test
+ToothGrowth_ttest <- t.test(len ~ supp, data = ToothGrowth)
+
+#load broom
+library(broom)
+
+#tidy the t-test model object
+tidy(ToothGrowth_ttest)
+
+
+lendingclub %>% summarise(median(loan_amnt), mean(int_rate), mean(annual_inc))
+
+lendingclub$purpose %>% recode( 
+        "credit_card" = "debt_related", 
+        "debt_consolidation" = "debt_related", 
+        "medical" = "debt_related",
+        "car" = "big_purchase", 
+        "major_purchase" = "big_purchase", 
+        "vacation" = "big_purchase",
+        "moving" = "life_change", 
+        "small_business" = "life_change", 
+        "wedding" = "life_change",
+        "house" = "home_related", 
+        "home_improvement" = "home_related")
+
+#Use aov() to build purpose_recode_aov
+purpose_recode_aov <- aov(funded_amnt ~ purpose_recode, data = lendingclub)
+
+#Conduct Tukey's HSD test to create tukey_output
+tukey_output <- TukeyHSD(purpose_recode_aov, conf.level = 0.95)
+
+#tidy tukey_output to make sense of the results
+broom::tidy(tukey_output)
+
+
+#for a 2x2 grid of plots:
+par(mfrow=c(2, 2))
+
+#plot grade_aov
+plot(grade_aov)
+
+#Bartlett's test for homogeneity of variance
+bartlett.test(int_rate ~ grade, data = lendingclub)
+
+#conduct the Kruskal-Wallis rank sum test
+kruskal.test(int_rate ~ as.factor(grade),
+             data = lendingclub)
+
+
+#load the pwr package
+library(pwr)
+
+#use the correct function from pwr to find the sample size
+pwr.t.test(n = NULL, 
+    d = 0.2, 
+    power = 0.8, 
+    sig.level = 0.05, 
+    alternative = "two.sided")
+
+#load ggplot2 and plot the a/b test results
+library(ggplot2)
+ggplot(lendingclub_ab, aes(Group, loan_amnt)) + geom_boxplot()
+
+#conduct a two-sided t-test
+t.test(loan_amnt ~ Group, data = lendingclub_ab)
+
+#build lendingclub_multi
+lendingclub_multi <-lm(loan_amnt ~ Group + grade + verification_status, data = lendingclub_ab)
+
+#examine lendingclub_multi results
+tidy(lendingclub_multi)
+```
+
