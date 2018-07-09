@@ -99,6 +99,9 @@ kruskal.test(int_rate ~ as.factor(grade),
 1. Systematic Sampling: every 5th or 12th etc.
 1. Multi-stage Sampling: combines above methods
 
+
+REduce function?
+
 ```{r}
 library(haven)
 nhanes_demo <- read_xpt(DEMO_file)
