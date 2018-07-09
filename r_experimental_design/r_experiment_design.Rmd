@@ -113,3 +113,15 @@ nhanes_combined <- list(nhanes_demo, nhanes_medical, nhanes_bodymeasures) %>%
   Reduce(function(df1,df2) inner_join(df1,df2,by="SEQN"), .)
 ```
 
+Randomized Complete Block Design
+
+Use blcoking when there is a nuisance factor: something that effects outcome but not of interests
+
+* Randomized: treatment is assigned randomly inside each block
+* Complete: treatment is used same number of times in each block
+* Block: experimental groups are blocked to be similar
+
+block what you can; randomized what you can't
+
+`agricolae` package
+
