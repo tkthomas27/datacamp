@@ -125,3 +125,46 @@ block what you can; randomized what you can't
 
 `agricolae` package
 
+```{r}
+#create designs using apropos()
+designs <- ls("package:agricolae", pattern = "design")
+print(designs)
+
+#use str() to view design.rcbd's criteria
+str(design.rcbd)
+
+#build trt and rep
+trt <- LETTERS[1:5]
+rep <- 4
+
+#Use trt and rep to build my_design_rcbd and view the sketch part of the object
+my_design_rcbd <- design.rcbd(trt, r=rep, seed = 42, serie=0)
+my_design_rcbd$sketch
+
+#make nhanes_final$riagendr a factor variable
+nhanes_final$riagendr <- as.factor(nhanes_final$riagendr)
+
+#use aov() to create nhanes_rcbd
+nhanes_rcbd <- aov(bmxwt ~ mcq365d + riagendr, data=nhanes_final)
+
+#check the results of nhanes_rcbd with summary()
+summary(nhanes_rcbd)
+
+#print the difference in weights by mcq365d and riagendr
+nhanes_final %>% group_by(mcq365d, riagendr) %>% summarise(mean_wt = mean(bmxwt, na.rm = TRUE))
+
+```
+
+
+```{r}
+#set up the 2x2 plotting grid and then plot nhanes_rcbd
+par(mfrow=c(2,2))
+plot(nhanes_rcbd)
+
+#run the code to view the interaction plots
+with(nhanes_final, interaction.plot(mcq365d, riagendr, bmxwt))
+
+#run the code to view the interaction plots
+with(nhanes_final, interaction.plot(riagendr, mcq365d, bmxwt))
+```
+
