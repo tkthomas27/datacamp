@@ -168,3 +168,7 @@ with(nhanes_final, interaction.plot(mcq365d, riagendr, bmxwt))
 with(nhanes_final, interaction.plot(riagendr, mcq365d, bmxwt))
 ```
 
+```{r}
+LETTERS[1:3]
+```
+
