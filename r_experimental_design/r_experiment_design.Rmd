@@ -169,6 +169,6 @@ with(nhanes_final, interaction.plot(riagendr, mcq365d, bmxwt))
 ```
 
 ```{r}
-LETTERS[1:3]
+letters[1:3]
 ```
 
