@@ -1,0 +1,508 @@
+---
+title: "Hierarchical and Mixed Effects Model"
+output: html_notebook
+---
+
+# Hierarchical and Mixed Effects
+
+Hierarchical model: nested data, not independent
+* student test scores not independent from one another if in same class, school, etc.
+* also known as nested models, multi-level models
+* random effect that pools information across groups
+* model with random and fixed effects is mixed effects
+* repeated measures or paired tests: same individuals over time
+
+Basic model; mean across all groups is beta
+with multiple interecepts; grups 2 and 3 agains global intercept
+-if want mean of each group - essentially anova
+interactions when groups have diffenrt slopes
+lm(y~x-1) estimates an intercept for each x
+
+geom_abline with manually specified slope and intercept works better with compleicated models
+
+```{r}
+# First, run a model without considering different intercept for each group
+out1 <- lm( response ~ x, multIntDemo)
+summary(out1)
+plot_output1(out1)
+
+# Considering same slope but different intercepts, the random-effect should be the second on the right hand side
+out2 <- lm( response ~ x + group - 1, multIntDemo)
+summary(out2)
+plot_output2(out2)
+
+# Considering different slope and intercept for each group (i.e., an interaction), the random-effect should be the second on the right hand side
+out3 <- lm( response ~ x + group - 1 + x:group, multIntDemo)
+summary(out3)
+plot_output3(out3)
+```
+
+
+students nested in classes classes nested in schools
+nested relationships creates multi level model
+mapping from one distribution to another; pool information; outliers have less impact and are treated as random effects
+random effect assumes normal distribution
+
+```{r}
+library(lme4)
+
+# random effects intercept model
+outLmer <- lmer( response ~ x + ( 1 | group), multIntDemo)
+
+# Look at model outputs 
+summary( outLmer )
+tidy( outLmer )
+
+# Extract predictor variables and plot
+extractAndPlotOutput(outLmer)
+
+# Random Effect slopes and intercepts
+outLmer2 <- lmer( response ~ ( x | group ), multIntDemo)
+summary(outLmer2)
+tidy(outLmer2)
+
+# Extract and plot
+plotOutput(outLmer2)
+```
+
+```{r}
+# Mixed effect model
+lmerModel <- lmer(mathgain ~ sex + 
+                  mathprep + mathknow + (1|classid) +
+                  (1|schoolid), data = studentData, na.action = "na.omit",
+                  REML = TRUE)
+summary(lmerModel)
+
+# Extract and plot 
+extractAndPlot(lmerModel)
+```
+
+## Linear Mixed Effects Models
+
+Demographic stocasticitiy: small populations
+* Random intercept with fixed mean: `(1 | group)`
+* Intercepts vary among g1 and g2 within g2: `(1 | g1/g2)`
+* Random Intercepts for 2 variables: `(1 | g1) + (1 | g2)`
+* correlated random slope and intercept: `x + x( | g)`
+* uncorrelated random slope and intercetp: `x + (x || g)`
+
+```{r}
+# First, build a lmer with state as a random effect. Then look at the model's summary and the plot of residuals. 
+birthRateStateModel <- lmer(BirthRate ~ (1|State), data = countyBirthsData)
+summary(birthRateStateModel)
+# plot residuals
+plot(birthRateStateModel)
+
+# Next, plot the predicted values from the model on top of the plot shown during the video.
+countyBirthsData$birthPredictState <-  predict(birthRateStateModel, countyBirthsData)
+ggplot() + theme_minimal() +
+    geom_point(data =countyBirthsData,
+               aes(x = TotalPopulation, y = BirthRate)) + 
+        geom_point(data = countyBirthsData,
+                   aes(x = TotalPopulation, y = birthPredictState),
+                   color = 'blue', alpha = 0.5) 
+
+# Include the AverageAgeofMother as a fixed effect within the lmer and state as a random effect
+ageMotherModel <- lmer( BirthRate ~ AverageAgeofMother + (1|State), countyBirthsData)
+summary(ageMotherModel)
+
+# Compare the random-effect model to the linear effect model 
+summary(lm(BirthRate ~ AverageAgeofMother, data = countyBirthsData))
+
+
+# Include the AverageAgeofMother as a correlated random-effect slope parameter
+ageMotherModelRandomCorrelated <- lmer( BirthRate ~ AverageAgeofMother + (AverageAgeofMother | State),countyBirthsData)
+summary(ageMotherModelRandomCorrelated)
+
+
+
+# Include the AverageAgeofMother as an uncorrelated random-effect slope parameter
+ageMotherModelRandomUncorrelated <- lmer( BirthRate ~ AverageAgeofMother + (AverageAgeofMother || State),countyBirthsData)
+summary(ageMotherModelRandomUncorrelated)
+```
+
+Age as fixed effect with Age as random effect correlated with Age; State is random effect; 
+
+REML: restricted expected maximum likelihood 
+NO P-VALUES
+
+```{r}
+# Extract the fixed-effect coefficients
+fixef(out)
+
+# Extract the random-effect coefficients
+ranef(out)
+
+# Estimate the confidence intervals 
+confint(out)
+
+
+# Extract out the parameter estimates and confidence intervals and manipulate the data
+dataPlot <- data.frame(cbind( fixef(out), confint(out)[ 3:4, ]))
+rownames(dataPlot)[1] <- "Intercept"
+colnames(dataPlot) <- c("mean", "l95", "u95")
+dataPlot$parameter <- rownames(dataPlot)
+
+# Print the new dataframe
+print(dataPlot)
+
+# Plot the results using ggplot2
+ggplot(dataPlot, aes(x = parameter, y = mean,
+                     ymin = l95, ymax = u95)) +
+    geom_hline( yintercept = 0, color = 'red' ) +
+    geom_linerange() + geom_point() + coord_flip() + theme_minimal()
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+x <- rio::import("~/github/weather/weather_comp/sun.csv") %>% filter(location == "Charlotte, North Carolina, United States")  %>% 
+  mutate(mon_num = as.character(match(month, month.abb))) %>% 
+  mutate(date = paste0("2018-",mon_num,"-01")) %>% 
+  mutate(date = as.Date(date)) %>% 
+  mutate(rana = runif(n(),0,1),
+         ranb = runif(n(),0,1),
+         ranc = runif(n(),0,1)) %>% 
+  filter(data_key == "sun_pct")
+
+ggplot(x, aes(x = date)) + 
+  geom_area(aes(y = data_value, fill = data_key)) +
+  scale_x_date(labels = scales::date_format("%b"), breaks = scales::date_breaks("months")) +
+  scale_fill_manual(values = c("#e0c73a"), name = "Time") +
+  geom_col(aes(y = rana), stata = "identity", alpha = 0.9, color = "blue", fill = "blue") +
+  guides(fill = FALSE, color = FALSE) +
+  theme(
+    plot.background = element_rect(fill="lightsteelblue2"),
+    panel.background = element_rect(fill="lightsteelblue2"),
+    panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+    axis.title.x=element_blank(),
+    axis.title.y=element_blank())
+```
+
+
+Temperature (red-orange)
+
+```{r}
+temp <- rio::import("~/github/weather/weather_comp/temps.csv") %>% filter(location == "Charlotte, North Carolina, United States") %>% 
+  mutate(mon_num = as.character(match(month, month.abb))) %>% 
+  mutate(date = paste0("2018-",mon_num,"-01")) %>% 
+  mutate(date = as.Date(date)) 
+
+yy <- y %>% select(-temp_avg, -mon_num, -month) %>% gather(data_key, data_value, -location, -date)
+
+ggplot(y, aes(x = date)) +
+  geom_ribbon(aes(ymax = temp_high_rec, ymin = temp_high_avg), fill = "#871528", alpha = 0.2) +
+  geom_ribbon(aes(ymax = temp_high_avg, ymin = temp_low_avg), fill = "#CC211B", alpha = 0.6) +
+  geom_ribbon(aes(ymax = temp_low_avg, ymin = temp_low_rec), fill = "#871528", alpha = 0.2) +
+  geom_label(data = yy, aes(date, data_value, label = data_value, fill = data_value, color = data_value), label.size = 0)+
+  viridis::scale_fill_viridis(option="magma") +
+  viridis::scale_color_viridis(option = "viridis", direction = -1) +
+  scale_x_date(labels = scales::date_format("%b"), breaks = scales::date_breaks("months")) +
+  guides(fill = FALSE, color = FALSE) +
+  theme(
+    plot.background = element_rect(fill="#3D0116"),
+    panel.background = element_rect(fill="#3D0116"),
+    panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+    axis.title.x=element_blank(),
+    axis.title.y=element_blank(),
+    legend.key = element_blank(),
+    legend.text = element_text(color = "white"),
+    axis.text.x = element_text(color = "white"),
+    axis.text.y = element_text(color = "white"),
+    axis.ticks.x = element_line(color = "white"),
+    axis.ticks.y = element_line(color = "white"))
+```
+
+https://stackoverflow.com/questions/48424682/how-do-i-limit-the-range-of-the-viridis-colour-scale
+
+percipitation (blue)
+```{r}
+precip <- rio::import("~/github/weather/weather_comp/precip.csv") %>% filter(location == "Charlotte, North Carolina, United States") %>% 
+  mutate(month = factor(month, levels = month.abb))
+
+ggplot(precip, aes(month, data_value, fill=data_key)) +
+            geom_bar(stat = "identity", position = "dodge") +
+            scale_fill_manual(values = c("#4E7AC7","#ADD5F7"), name = "Type") +
+            labs(y = "Precipitation (Inches)", x = "Month") +
+            theme(
+              text = element_text(color = "white"),
+              plot.background = element_rect(fill="#16193B"),
+              panel.background = element_rect(fill="#16193B"),
+              panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+              axis.title.x=element_blank(),
+              axis.title.y=element_blank(),
+              legend.background = element_rect(fill="#16193B", size=.5, linetype="dotted"),
+              legend.position="bottom",
+              legend.key = element_blank(),
+              axis.text.x = element_text(color = "white"),
+              axis.text.y = element_text(color = "white"),
+              axis.ticks.x = element_line(color = "white"),
+              axis.ticks.y = element_line(color = "white"))
+```
+
+
+
+Sun (Yellow)
+https://color.adobe.com/Teal-Orange-color-theme-2592429/edit/?copy=true&base=2&rule=Custom&selected=3&name=Copy%20of%20Teal%20%20Orange&mode=rgb&rgbvalues=0,0.180392,0.25098,0.164706,0.341176,0.411765,1,1,1,0.980392,0.741176,0.290196,0.980392,0.588235,0&swatchOrder=0,1,2,3,4
+
+```{r}
+sunx <- rio::import("~/github/weather/weather_comp/sun.csv") %>% filter(location == "Charlotte, North Carolina, United States") %>% 
+  mutate(date = as.Date(date)) %>% 
+  mutate(data_key = factor(data_key, c("pct_night", "cloudy_pct", "sun_actual_pct"))) 
+  
+ggplot(sunx, aes(x = date)) + 
+  geom_area(aes(y = data_value, fill = data_key)) +
+  scale_x_date(labels = scales::date_format("%b"), breaks = scales::date_breaks("months")) +
+  scale_fill_manual(values = c("#455C7B", "#76696C", "#FFAA5C"), 
+                    name = element_blank(),
+                    labels=c("Night", "Cloudy", "Sunny")) +
+  theme(
+    plot.background = element_rect(fill="#AC6C82"),
+    panel.background = element_rect(fill="#AC6C82"),
+    panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+    axis.title.x=element_blank(),
+    axis.title.y=element_blank(),
+    legend.background = element_rect(fill="#AC6C82", size=.5, linetype="dotted"),
+    legend.position="bottom",
+    legend.key = element_blank(),
+    legend.text = element_text(color = "white"),
+    axis.text.x = element_text(color = "white"),
+    axis.text.y = element_text(color = "white"),
+    axis.ticks.x = element_line(color = "white"),
+    axis.ticks.y = element_line(color = "white"))
+
+```
+
+create niceness index
+perfect score: temp = average(high and low) = 76; sunny actual = .5; rain = 0
+
+```{r}
+tempc <- rio::import("~/github/weather/weather_comp/temps.csv")
+
+sunc <- rio::import("~/github/weather/weather_comp/sun.csv") %>% spread(data_key, data_value)
+
+precipc <- rio::import("~/github/weather/weather_comp/precip.csv") %>% spread(data_key, data_value)
+
+comfort <- tempc %>% inner_join(sunc) %>% inner_join(precipc) %>% 
+  mutate(date = as.Date(paste0("2018-",month,"-01"),"%Y-%b-%d")) %>% 
+  mutate(date = replace(date, month == "Dec", as.Date("2018-12-31"))) %>% 
+  mutate(avg_temp = (temp_high_avg + temp_low_avg)/2,
+         rain_d = rain/30,
+         snow_d = snow/30) %>% 
+  mutate(temp_comfort = ((temp_high_avg-73)/73) + ((temp_low_avg-60)/60)) %>% 
+  mutate(temp_comfort = replace(temp_comfort, temp_comfort < -1, -1)) %>% 
+  mutate(other_comfort = cloudy_pct + pct_night + rain_d + (.2 + snow_d)) %>% 
+  mutate(other_comfort = replace(other_comfort, other_comfort > 1, 1)) %>% 
+  mutate(comfort = if_else(temp_comfort >= 0, temp_comfort + other_comfort, temp_comfort - other_comfort)) %>% 
+  select(location, date, comfort) %>% 
+  group_by(location) %>% 
+  complete(date = seq.Date(min(date), max(date), by="day")) %>% 
+  mutate(ci = zoo::na.approx(comfort, na.rm =FALSE)) 
+
+x<- comfort %>% filter(location == "Jerusalem, Israel") 
+ggTimeSeries::ggplot_calendar_heatmap(x, 'date', 'ci') +
+  scale_fill_gradient2(low = "blue", mid = "green", high = "red",
+                             midpoint = 0,
+                             na.value = "grey") +
+        guides(fill = FALSE, color = FALSE) +
+        ggthemes::theme_solarized() %+replace%
+        theme(
+          panel.border = element_blank(),
+          panel.background = element_blank(),
+          strip.background = element_blank(),
+          strip.text = element_blank(),
+          axis.title.x = element_blank(),
+          axis.text.x = element_text(size = 14),
+          axis.title.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.text.y = element_blank(),
+          axis.line.y = element_blank()
+        )
+```
+
+
+```{r}
+cluster <- tempc %>% inner_join(sunc) %>% inner_join(precipc) %>% 
+      group_by(location) %>% 
+      summarise(low_temp = mean(temp_low_avg),
+                high_temp = mean(temp_high_avg),
+                cloudy = mean(cloudy_pct),
+                rain = sum(rain),
+                snow = sum(snow)) %>% 
+      distinct(location, .keep_all = TRUE) %>% 
+      filter(is.na(cloudy)==FALSE) %>% 
+      mutate_at(vars(-location), funs(scale)) %>% 
+      mutate_at(vars(-location), as.numeric)
+
+# distance <- factoextra::get_dist(scale(cluster[,2:6]))
+
+c2 <- scale(cluster[-1])
+
+k2 <- kmeans(c2, centers = 5, nstart = 25)
+
+k2_loc <- cluster %>% 
+    mutate(avg_temp = (low_temp + high_temp)/2) %>% 
+    mutate(precip = rain + snow) %>% 
+    mutate(precip = replace(precip, precip > 5, 5)) 
+
+k2_loc$cluster <- k2$cluster
+k2_loc <- as_tibble(k2_loc)
+
+group.colors <- c("1" = "#d33682", "2" = "#859900", "3" ="#073642", "4" = "#268bd2", "5" = "#cb4b16")
+
+kmeans_plot <- ggplot(data = k2_loc) + 
+    geom_point(aes(x = precip, y = avg_temp, color = cluster, text = location)) +
+    geom_point(data=k2_loc[k2_loc$location=="Kingston, Jamaica", ], 
+               aes(x = precip, y = avg_temp, color = cluster, text = location), 
+               size=6, alpha = 0.8, shape = 15) +
+    scale_color_manual(values = group.colors) +
+    ggthemes::theme_solarized() %+replace%
+        theme(
+          axis.title.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.text.x = element_blank(),
+          axis.title.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.text.y = element_blank()
+          # axis.line.y = element_blank()
+        )
+
+
+plotly::ggplotly(kmeans_plot, tooltip = "text") 
+
+kmeans_plot %>% ggplotly(tooltip = "text") %>% layout(annotations = a)
+
+
+gg <- plotly::ggplotly(kmeans_plot)
+
+a <- c(
+  autotick = FALSE,
+  ticks = "outside",
+  tick0 = 0,
+  dtick = 0.25,
+  ticklen = 5,
+  tickwidth = 2
+)
+
+gg <- layout(gg, layout(xaxis = a))
+gg
+
+# labels = c("Hot and Wet", "Comfortable", "Cold and Wet", "Cold and Dry", "Hot and Dry") 
+
+
+
+xstart = 0
+xmax = 1
+xmin = -1
+padding = 0.05
+ypos = -0.1
+
+a <- c(
+            x=xmin,
+            y=ypos,
+            ax=xstart + padding,
+            ay=ypos,
+            xref='x',
+            axref='x',
+            yref='paper',
+            ayref='paper',
+            showarrow=TRUE,
+            arrowhead=2,
+            arrowsize=1,
+            arrowwidth=3,
+            arrowcolor='#0000ff'
+)
+
+pal <- c("#d33682", "#859900", "#073642", "#268bd2", "#cb4b16")
+
+plot_ly(data = k2_loc, 
+        x = ~precip, 
+        y = ~avg_temp, 
+        color = ~cluster,
+        colors = pal,
+        text = ~location,
+        hoverinfo = 'text',
+        type = "scatter", 
+        mode = "markers") %>% 
+    layout(yaxis = list(tile = "Temp -->"), xaxis = list(title = "Precipitation -->"))
+
+
+```
+
+
+
+
+
+
+
+
+
+```{r}
+set.seed(666)
+cluster <- tempc %>% inner_join(sunc) %>% inner_join(precipc) %>% 
+      group_by(location) %>% 
+      summarise(low_temp = mean(temp_low_avg),
+                high_temp = mean(temp_high_avg),
+                cloudy = mean(cloudy_pct),
+                rain = sum(rain),
+                snow = sum(snow)) %>% 
+      distinct(location, .keep_all = TRUE) %>% 
+      filter(is.na(cloudy)==FALSE) %>% 
+      mutate_at(vars(-location), funs(scale)) %>% 
+      mutate_at(vars(-location), as.numeric)
+
+c2 <- scale(cluster[-1])
+
+k2 <- kmeans(c2, centers = 5, nstart = 25)
+
+k2_loc <- cluster %>% 
+    mutate(avg_temp = (low_temp + high_temp)/2) %>% 
+    mutate(precip = rain + snow) %>% 
+    mutate(precip = replace(precip, precip > 5, 5))
+
+k2_loc$cluster <- k2$cluster
+k2_loc <- as_tibble(k2_loc) 
+
+k2_loc$cluster = recode(k2_loc$cluster, `4` = "Hot and Wet", 
+                 `1` = "Comfortable", 
+                 `3` = "Cold and Wet", 
+                 `2` = "Cold and Dry", 
+                 `5` = "Hot and Dry")
+
+cities <- k2_loc %>% filter(location %in% c("Kingston, Jamaica", "Jerusalem, Israel"))
+
+plot_ly(data = k2_loc, 
+        x = ~precip, 
+        y = ~avg_temp, 
+        color = ~cluster,
+        colors = c("#268bd2", "#073642", "#859900", "#d33682", "#cb4b16"),
+        text = ~location,
+        hoverinfo = 'text',
+        type = "scatter", 
+        mode = "markers") %>% 
+    layout(yaxis = list(title = "Temp -->", 
+                        showticklabels = FALSE), 
+           xaxis = list(title = "Precipitation -->",
+                        showticklabels = FALSE),
+           plot_bgcolor = "#fdf6e3",
+           paper_bgcolor = "#fdf6e3", 
+           annotations = list(x = cities$precip,
+                              y = cities$avg_temp,
+                              text = cities$location,
+                              # bordercolor='#c7c7c7',
+                                borderwidth=0,
+                                borderpad=2,
+                                bgcolor="white",
+                                opacity=0.9))
+```
+

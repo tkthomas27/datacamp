@@ -1,0 +1,40 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Identifying the Best Recruiting Source
+
+* identify groups
+* calculate summary stats
+* plot differences
+
+quality of hire: retention; manager satisfaction; performance; time to productivity
+
+attrition rate: attrition (number of employees who left)/headcount
+
+```{r}
+# bar plots
+```
+
+# Analyzing Employee Engagement
+
+survey data
+
+```{r}
+# Create the disengaged variable and assign the result to survey
+survey_disengaged <- survey %>% 
+  mutate(disengaged = ifelse(engagement <= 2, 1, 0)) 
+
+survey_disengaged
+
+# Summarize the three variables by department
+survey_summary <- survey_disengaged %>% 
+  group_by(department) %>% 
+  summarize(pct_disengaged = mean(disengaged),
+            avg_salary = mean(salary),
+            avg_vacation_days = mean(vacation_days_taken))
+
+survey_summary
+```
+
