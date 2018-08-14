@@ -1,0 +1,177 @@
+---
+title: "Marketing Analytics in R: Statistical Analysis"
+output: html_notebook
+---
+
+## Modeling Customer Lifetime Value with Linear Regression
+
+* Overfitting: fitting to the errors as well
+* AIC penalize every additional explantory variable
+* AIC minimizing model for comparing models
+* stepAIC: automatic model picking
+
+```{r}
+# getting an overview of new data
+summary(salesData2_4)
+
+# predicting sales
+predSales5 <- predict(salesModel2, newdata = salesData2_4)
+
+# calculating mean of future sales
+mean(predSales5, na.rm=TRUE)
+
+```
+
+## Churn Prevention in Online Marketing
+
+Logistic regression to predict if a customer is coming back
+
+1. Probability to churn: not easy to predict directly; linear regression gives non-sensical
+$$
+P(Y=1)
+$$
+
+2. Log Odds
+
+$$
+log \frac{P(Y=1)}{P(Y = 0)} = \beta_0 + \sum_{p=1}^P \beta_p x_ps
+$$
+
+3. Odds
+
+$$
+\frac{P(Y=1)}{P(Y = 0)} = e^{ \beta_0 + \sum_{p=1}^P \beta_p x_ps}
+$$
+
+4. Probability to Churn: final model; probabilty of target variable
+
+$$
+P(Y = 1) = \frac{e^{ \beta_0 + \sum_{p=1}^P \beta_p x_ps}}{1 + e^{ \beta_0 + \sum_{p=1}^P \beta_p x_ps}}
+$$
+
+Modeling and model selection
+* coefficeint is effect on log odds; can only get sense of direction
+* use exp to get effect on odds; coefficeint of 1.49 -> increase odds of subscribing by 49%
+* can use `stepAIC` to find best variables in the model
+
+```{r}
+# Build logistic regression model
+logitModelFull <- glm(PaymentDefault ~ limitBal + sex + education + marriage +
+                   age + pay1 + pay2 + pay3 + pay4 + pay5 + pay6 + billAmt1 + 
+                   billAmt2 + billAmt3 + billAmt4 + billAmt5 + billAmt6 + payAmt1 + 
+                   payAmt2 + payAmt3 + payAmt4 + payAmt5 + payAmt6, 
+                family = binomial, data = defaultData)
+
+# Take a look at the model
+summary(logitModelFull)
+
+# Take a look at the odds
+coefsexp <- coef(logitModelFull) %>% exp() %>% round(2)
+coefsexp
+
+
+
+library(MASS)
+# The old (full) model
+logitModelFull <- glm(PaymentDefault ~ limitBal + sex + education + marriage +
+                   age + pay1 + pay2 + pay3 + pay4 + pay5 + pay6 + billAmt1 + 
+                   billAmt2 + billAmt3 + billAmt4 + billAmt5 + billAmt6 + payAmt1 + 
+                   payAmt2 + payAmt3 + payAmt4 + payAmt5 + payAmt6, 
+                 family = binomial, defaultData)
+
+#Build the new model
+logitModelNew <- stepAIC(logitModelFull,trace = 0) 
+
+#Look at the model
+summary(logitModelNew) 
+
+# Save the formula of the new model (it will be needed for the out-of-sample part) 
+formulaLogit <- as.formula(summary(logitModelNew)$call)
+formulaLogit
+```
+
+### In Sample Modeling and Thresholding
+Pseudo $R^2$ Statistics
+
+1. McFadden
+$$
+R^2 = 1 - \frac{L_{null}}{L_{full}}
+$$
+
+2. Cox and Snell
+$$
+R^2 = 1 - \left(\frac{L_{null}}{L_{full}}\right)^{2/n}
+$$
+
+3. Nagelkerke
+
+$$
+R^2 = \frac{1 - \left(\frac{L_{null}}{L_{full}}\right)^{2/n}}{1 - L_{null}^{2/n}}
+$$
+
+* If $>0.2$ reasonable; $>0.4$ good; $>0.5$ very good
+
+
+Accuracy: predict values and find difference; confusion matrix
+* look at classification broken down by groups
+* expected payoffs: find optimal threshold
+
+```{r}
+# see different R2 numbers
+library(descr)
+LogRegR2(logitModelNew)
+
+
+
+# Make predictions using the full Model
+defaultData$predFull <- predict(logitModelFull, type = "response", na.action = na.remove)
+
+# Construct the in-sample confusion matrix
+confMatrixModelFull <- confusion.matrix(defaultData$PaymentDefault,defaultData$predFull, threshold = 0.5)
+confMatrixModelFull
+
+# Calculate the accuracy for the full Model
+accuracyFull <- sum(diag(confMatrixModelFull)) / sum(confMatrixModelFull)
+accuracyFull
+
+
+
+# Calculate the accuracy for 'logitModelNew'
+# Make prediction
+defaultData$predNew <- predict(logitModelNew, type = "response", na.action = na.remove)
+
+# Construct the in-sample confusion matrix
+confMatrixModelNew <- confusion.matrix(defaultData$PaymentDefault, defaultData$predNew, threshold = 0.5)
+confMatrixModelNew
+
+# Calculate the accuracy...
+accuracyNew <- sum(diag(confMatrixModelNew)) / sum(confMatrixModelNew)
+accuracyNew
+
+# and compare it to the full model's accuracy
+accuracyFull
+
+```
+
+Payoff Matrix
+```{r}
+library(SDMTools)
+# Prepare data frame with threshold values and empty payoff column
+payoffMatrix <- data.frame(threshold = seq(from = 0.1, to = 0.5, by = 0.1),
+                           payoff = NA) 
+payoffMatrix 
+ 
+for(i in 1:length(payoffMatrix$threshold)) {
+  # Calculate confusion matrix with varying threshold
+  confMatrix <- confusion.matrix(defaultData$PaymentDefault,
+                defaultData$predNew, 
+                threshold = payoffMatrix$threshold[i])
+  # Calculate payoff and save it to the corresponding row
+  payoffMatrix$payoff[i] <- confMatrix[1,1]*250 + confMatrix[1,2]*(-1000)
+}
+payoffMatrix
+```
+
+
+
+### Out of sample validation and cross validation
