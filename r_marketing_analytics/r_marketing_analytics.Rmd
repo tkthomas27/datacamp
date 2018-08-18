@@ -175,3 +175,67 @@ payoffMatrix
 
 
 ### Out of sample validation and cross validation
+```{r}
+# Split data in train and test set
+set.seed(534381) 
+defaultData$isTrain <- rbinom(nrow(defaultData), 1, 0.66)
+train <- subset(defaultData, defaultData$isTrain == 1)
+test <- subset(defaultData, defaultData$isTrain  == 0)
+
+logitTrainNew <- glm(formulaLogit, family = binomial, data = train) # Modeling
+test$predNew <- predict(logitTrainNew, type = "response", newdata = test) # Predictions
+
+
+
+
+# Out-of-sample confusion matrix and accuracy
+confMatrixModelNew <- confusion.matrix(test$PaymentDefault, test$predNew, threshold = 0.3) 
+sum(diag(confMatrixModelNew)) / sum(confMatrixModelNew) # Compare this value to the in-sample accuracy
+
+library(boot)
+# Accuracy function
+costAcc <- function(r, pi = 0) {
+  cm <- confusion.matrix(r, pi, threshold = 0.3)
+  acc <- sum(diag(cm)) / sum(cm)
+  return(acc)
+}
+
+# Cross validated accuracy for logitModelNew
+set.seed(534381)
+cv.glm(defaultData, logitModelNew, cost = costAcc, K = 6)$delta[1]
+```
+
+## Survival Analysis in Customer Relationship Management
+
+* censored data: customer data ends because we can't see what happens; kind of missing data; not suitable for logistic regression
+* survival analysis: time to event; no loss of information due to; deeper insights --> when will happen not just if
+* censoring: random type 1 censoring; churn can't know if it will happen in the future, only when it happens
+* for surival analysis need: time under observation and status at end of time
+
+```{r}
+# Look at the head of the data
+head(dataNextOrder)
+
+# Plot a histogram
+ggplot(dataNextOrder) +
+  geom_histogram(aes(x = daysSinceFirstPurch,
+                     fill = factor(boughtAgain))) +
+  facet_grid( ~ boughtAgain) + # Separate plots for boughtAgain = 1 vs. 0
+  theme(legend.position = "none") # Don't show legend
+```
+
+### Survival curev analysis by Kaplan Meier
+
+* create survival object
+* survival function: prob that customer will not churn leading upt to time point t
+* hazard function: prob that customer will have churned leading up to t
+* hazard rate: prob that customer will churn in small interval around time t given event has not yet happened
+* surviavl function is not known; need to estimate; censoring makes it more complicated
+* Kaplan Meier takes into those at risk (those who haven't but might)
+
+```{r}
+text <- c("hello :) :D ;( yes :cake:")
+
+```
+
+
